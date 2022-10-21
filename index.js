@@ -5,10 +5,19 @@ const https = require("https");
 const externalUrl = "https://api.data.gov.sg/v1/transport/carpark-availability";
 const port = 3000;
 
+let result = "";
+
 app.listen(port);
 console.log("Server started at http://localhost:" + port);
 
 app.get("/", async function (req, res) {
+  try {
+    await doGetRequest();
+    res.send(result);
+  } catch (error) {}
+});
+
+async function doGetRequest() {
   let small = []; // less than 100
   let medium = []; // 100 or more, less than 300
   let big = []; // 300 or more, less than 400
@@ -18,55 +27,36 @@ app.get("/", async function (req, res) {
     rejectUnauthorized: false,
   });
   axios.defaults.httpsAgent = httpsAgent;
-  async function doGetRequest() {
-    let res = await axios.get(externalUrl);
-    [...res.data.items[0].carpark_data].forEach((carpark) => {
-      carpark.carpark_info.forEach((info) => {
-        if (info.total_lots < 100) {
-          saveData(small, carpark, info);
-        } else if (info.total_lots < 300) {
-          saveData(medium, carpark, info);
-        } else if (info.total_lots < 400) {
-          saveData(big, carpark, info);
-        } else {
-          saveData(large, carpark, info);
-        }
-      });
+  let res = await axios.get(externalUrl);
+  [...res.data.items[0].carpark_data].forEach((carpark) => {
+    carpark.carpark_info.forEach((info) => {
+      if (info.total_lots < 100) {
+        saveData(small, carpark, info);
+      } else if (info.total_lots < 300) {
+        saveData(medium, carpark, info);
+      } else if (info.total_lots < 400) {
+        saveData(big, carpark, info);
+      } else {
+        saveData(large, carpark, info);
+      }
     });
+  });
 
-    sortArray(small);
-    sortArray(medium);
-    sortArray(big);
-    sortArray(large);
-  }
+  small = sortArray(small);
+  medium = sortArray(medium);
+  big = sortArray(big);
+  large = sortArray(large);
 
-  try {
-    await doGetRequest();
-  } catch (error) {
-    console.log(error);
-  }
-
-  let result = "";
+  result = "";
   result += "<h1>Singapore Carpark Availability<h1/>";
-
   result = displayData(result, "Small", small);
   result = displayData(result, "Medium", medium);
   result = displayData(result, "Big", big);
   result = displayData(result, "Large", large);
-
   result += "<script>";
   result += "setInterval('window.location.reload()',10000)";
   result += "</script>";
-
-  res.send(result);
-
-  //   res.send([
-  //     { small: small },
-  //     { medium: medium },
-  //     { big: big },
-  //     { large: large },
-  //   ]);
-});
+}
 
 function saveData(arr, data, detail) {
   arr.push({
@@ -90,6 +80,37 @@ function sortArray(arr) {
       }
     }
   }
+  let highestArr = getHighestList(arr);
+  let lowestArr = getLowestList(arr);
+  arr = [...highestArr, ...lowestArr];
+  return arr;
+}
+
+function getHighestList(arr) {
+  let highest = arr[0];
+  let highestArr = [highest];
+
+  for (let i = 1; i < arr.length; i++) {
+    if (parseInt(highest.available) > parseInt(arr[i].available)) {
+      break;
+    } else {
+      highestArr.push(arr[i]);
+    }
+  }
+  return highestArr;
+}
+function getLowestList(arr) {
+  let lowest = arr[arr.length - 1];
+  let lowestArr = [lowest];
+
+  for (let i = arr.length - 2; i < arr.length; i--) {
+    if (parseInt(lowest.available) < parseInt(arr[i].available)) {
+      break;
+    } else {
+      lowestArr.push(arr[i]);
+    }
+  }
+  return lowestArr;
 }
 
 function displayData(result, type, content) {
