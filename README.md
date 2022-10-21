@@ -1,1 +1,5 @@
-# Singapore_Carpark_Availability
+#Setup
+
+$ npm install
+$ node .\index.js
+
